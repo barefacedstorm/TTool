@@ -2,7 +2,7 @@
 Python based HTML Trace-route
 
 
-Very basic option if you work in browsers instead of terminals
+Very basic option if you work in browsers instead of terminals, I figured if hosted internally end users would be able to assist troubleshooting easier.
 
 Toss app.py and templates folder in the location of your choice
 
