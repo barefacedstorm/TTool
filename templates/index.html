@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traceroute Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        form {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #1e1e1e;
+            border-radius: 10px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        input, button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            border: none;
+        }
+
+        input {
+            background-color: #333333;
+            color: #ffffff;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .results {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #1e1e1e;
+            border-radius: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #333333;
+        }
+
+        tr:nth-child(even) {
+            background-color: #2a2a2a;
+        }
+    </style>
+</head>
+<body>
+    <h1>Traceroute Tool</h1>
+    <form id="traceroute-form">
+        <label for="destination">Destination (Hostname or IP):</label>
+        <input type="text" id="destination" name="destination" required>
+
+        <label for="max_hops">Max Hops (default is 30):</label>
+        <input type="number" id="max_hops" name="max_hops" value="30">
+
+        <label for="timeout">Timeout (seconds, default is 3):</label>
+        <input type="number" id="timeout" name="timeout" value="3">
+
+        <button type="submit">Run Traceroute</button>
+    </form>
+
+    <div class="results" id="results" style="display:none;">
+        <h2>Traceroute Results</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Hop</th>
+                    <th>IP Address</th>
+                    <th>Latency</th>
+                    <th>Geolocation</th>
+                    <th>ASN/Organization</th>
+                </tr>
+            </thead>
+            <tbody id="results-body"></tbody>
+        </table>
+    </div>
+
+    <script>
+        document.getElementById("traceroute-form").addEventListener("submit", async function(event) {
+            event.preventDefault();
+
+            // Get form data
+            const destination = document.getElementById("destination").value.trim();
+            const maxHops = document.getElementById("max_hops").value || 30; // Default to 30
+            const timeout = document.getElementById("timeout").value || 3;   // Default to 3
+
+            // Clear previous results
+            const resultsBody = document.getElementById("results-body");
+            resultsBody.innerHTML = "";
+
+            // Show loading message
+            const resultsDiv = document.getElementById("results");
+            resultsDiv.style.display = "block";
+            resultsBody.innerHTML = "<tr><td colspan='5'>Running traceroute...</td></tr>";
+
+            try {
+                // Send POST request to /traceroute
+                const response = await fetch("/traceroute", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ destination, max_hops: maxHops, timeout })
+                });
+
+                if (!response.ok) {
+                    throw new Error("Failed to fetch traceroute results.");
+                }
+
+                const data = await response.json();
+
+                // Populate results table
+                resultsBody.innerHTML = "";
+                data.forEach(hop => {
+                    const row = `
+                        <tr>
+                            <td>${hop.hop}</td>
+                            <td>${hop.ip}</td>
+                            <td>${hop.latency}</td>
+                            <td>${hop.geolocation}</td>
+                            <td>${hop.asn_or_org}</td>
+                        </tr>`;
+                    resultsBody.innerHTML += row;
+                });
+
+                if (data.length === 0) {
+                    resultsBody.innerHTML = "<tr><td colspan='5'>No data available.</td></tr>";
+                }
+
+            } catch (error) {
+                console.error(error);
+                resultsBody.innerHTML = `<tr><td colspan='5'>Error running traceroute. Please try again.</td></tr>`;
+            }
+        });
+    </script>
+</body>
+</html>
