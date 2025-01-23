@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Traceroute Tool</title>
     <style>
+    .arrow-head {
+        color: #ff4444;
+        font-size: 20px;
+        transform-origin: center;
+    }
         body {
             font-family: Arial, sans-serif;
             background-color: #121212;
@@ -169,3 +174,96 @@
     </script>
 </body>
 </html>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<div id="map" style="height: 400px; margin: 20px auto; max-width: 800px; border-radius: 10px;"></div>
+
+<style>
+    /* Add this with your existing styles */
+    #map {
+        height: 400px;
+        width: 100%;
+        background: #333333;
+        z-index: 1;
+    }
+</style>
+<script>
+    let map;
+    let pathLayer;
+
+    // Initialize map on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        initMap();
+    });
+
+    function initMap() {
+        if (map) {
+            map.remove();
+        }
+        map = L.map('map').setView([20, 0], 2);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '©OpenStreetMap, ©CartoDB',
+            maxZoom: 19,
+            minZoom: 2
+        }).addTo(map);
+        pathLayer = L.layerGroup().addTo(map);
+    }
+
+    // Update the fetch response handling in your existing submit event listener
+    document.getElementById("traceroute-form").addEventListener("submit", async function(event) {
+        event.preventDefault();
+
+        // Clear existing path and markers
+        pathLayer.clearLayers();
+
+        // Get form data
+        const destination = document.getElementById("destination").value.trim();
+        const maxHops = document.getElementById("max_hops").value || 30;
+        const timeout = document.getElementById("timeout").value || 3;
+
+        try {
+            const response = await fetch("/traceroute", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ destination, max_hops: maxHops, timeout })
+            });
+
+            const data = await response.json();
+
+            // Create path coordinates array
+            let validCoordinates = data
+                .filter(hop => hop.coordinates && hop.coordinates.lat && hop.coordinates.lon)
+                .map(hop => [hop.coordinates.lat, hop.coordinates.lon]);
+
+            // Add markers for each valid hop
+            validCoordinates.forEach((coord, index) => {
+                const hop = data[index];
+                L.marker(coord)
+                    .bindPopup(`Hop ${hop.hop}: ${hop.ip}<br>${hop.geolocation}`)
+                    .addTo(pathLayer);
+            });
+
+            // Draw path line if we have multiple points
+            if (validCoordinates.length > 1) {
+                L.polyline(validCoordinates, {
+                    color: '#ff4444',
+                    weight: 3,
+                    dashArray: '10, 10',
+                    opacity: 0.8
+                }).addTo(pathLayer);
+
+                // Fit map to show all points
+                map.fitBounds(L.latLngBounds(validCoordinates));
+            }
+
+            // Update results table as before
+            // ... existing table update code ...
+
+        } catch (error) {
+            console.error(error);
+            resultsBody.innerHTML = `<tr><td colspan='5'>Error running traceroute. Please try again.</td></tr>`;
+        }
+    });
+</script>
