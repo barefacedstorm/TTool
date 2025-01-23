@@ -5,6 +5,7 @@ import requests
 from flask import Flask, request, jsonify, render_template
 from scapy.all import IP, UDP, sr1
 
+# Set up logging configuration
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,7 @@ def index():
 def get_network_path(source_ip, destination_ip, max_hops=30, timeout=3):
     path_data = []
 
-    # Start with client location
+    # Start with client location - exact coordinates
     source_geo, source_asn, source_coords = get_geolocation_and_asn(source_ip)
     path_data.append({
         "hop": 1,
@@ -56,7 +57,7 @@ def get_network_path(source_ip, destination_ip, max_hops=30, timeout=3):
         "coordinates": source_coords
     })
 
-    # Try ICMP first for each hop
+    # Get intermediate hops with precise locations
     ttl = 2
     while ttl <= max_hops:
         ip_packet = IP(dst=destination_ip, ttl=ttl)
@@ -69,7 +70,7 @@ def get_network_path(source_ip, destination_ip, max_hops=30, timeout=3):
         latency = round((end_time - start_time) * 1000, 2)
 
         if reply is None:
-            # ICMP blocked, fallback to BGP data
+            # Use BGP data with datacenter locations
             asn_number = source_asn.split()[0].replace('AS', '') if source_asn else None
             if asn_number:
                 response = requests.get(f"https://api.bgpview.io/asn/{asn_number}/upstreams")
@@ -123,4 +124,4 @@ def traceroute():
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5009)
+    app.run(host='0.0.0.0', port=5000)
