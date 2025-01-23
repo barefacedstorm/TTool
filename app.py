@@ -1,9 +1,10 @@
-from flask import Flask, request, jsonify, render_template
-from flaskwebgui import FlaskUI
-from scapy.all import IP, UDP, sr1, ICMP
-import requests
 import socket
 import time
+
+import requests
+from flask import Flask, request, jsonify, render_template
+from flaskwebgui import FlaskUI
+from scapy.all import IP, UDP, sr1
 
 app = Flask(__name__)
 
@@ -16,11 +17,15 @@ def get_geolocation_and_asn(ip):
             geolocation = f"{data['city']}, {data['regionName']}, {data['country']}"
             asn = data.get('as')
             org_name = data.get('org', 'Organization not available')
-            return geolocation, asn if asn else org_name
+            coordinates = {
+                'lat': data['lat'],
+                'lon': data['lon']
+            }
+            return geolocation, asn if asn else org_name, coordinates
         else:
-            return "Geolocation not available", "Organization not available"
+            return "Geolocation not available", "Organization not available", None
     except Exception as e:
-        return f"Error: {e}", "Organization not available"
+        return f"Error: {e}", "Organization not available", None
 
 # Route to render the front-end HTML page
 @app.route('/')
@@ -67,27 +72,21 @@ def traceroute():
                     "ip": "*",
                     "latency": "ICMP blocked",
                     "geolocation": "Request timed out",
-                    "asn_or_org": "Organization not available"
+                    "asn_or_org": "Organization not available",
+                    "coordinates": None
                 })
-            elif reply.type == 3:  # Destination reached
-                geolocation, asn_or_org = get_geolocation_and_asn(reply.src)
-                result.append({
-                    "hop": ttl,
-                    "ip": reply.src,
-                    "latency": f"{latency} ms",
-                    "geolocation": geolocation,
-                    "asn_or_org": asn_or_org
-                })
-                break
             else:
-                geolocation, asn_or_org = get_geolocation_and_asn(reply.src)
+                geolocation, asn_or_org, coordinates = get_geolocation_and_asn(reply.src)
                 result.append({
                     "hop": ttl,
                     "ip": reply.src,
                     "latency": f"{latency} ms",
                     "geolocation": geolocation,
-                    "asn_or_org": asn_or_org
+                    "asn_or_org": asn_or_org,
+                    "coordinates": coordinates
                 })
+                if reply.src == destination_ip:
+                    break
 
             ttl += 1
 
